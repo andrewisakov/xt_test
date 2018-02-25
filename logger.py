@@ -15,5 +15,3 @@ def rotating_log(path, name, log_level=logging.INFO):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
-
-

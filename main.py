@@ -1,21 +1,18 @@
 #!/usr/bin/python3
-from peewee import prefetch
 import datetime
 import models
 import rules
 
 
+class Rule(object):
+    pass
+
+
 class Order(object):
-    def __init__(self, order_id: int=None):
-        if (order_id is not None) and isinstance(order_id, int):
-            self._order = models.Order.get(models.Order.id == order_id)
-            self._order = prefetch(
-                models.Order.select().where(models.Order.id == order_id),
-                models.OrderItem.select(), models.Item.select(),
-                models.ItemRules.select(), models.Rule.select())[0]
-        else:
-            self._order = models.Order.create()
-        # print(self._order)
+    def __init__(self, order: models.Order):
+        self._order = order
+        for order_item in order.items:
+            print(order_item.item.rules)
 
     @property
     def id(self):
@@ -43,17 +40,24 @@ class Order(object):
             # TODO: Проверить вхождение item,id в _item.rules.item_related
             pass
         self._order.items.append(_item)
+        self._order.save()
 
-    def del_item(self, item_pos: int):
-        return self._order[item_pos]
+    # def del_item(self, item_pos: int):
+    #     return self._order[item_pos]
 
-    def update_item(self, item):
-        pass
+    # def update_item(self, item):
+    #     pass
 
 
 if __name__ == '__main__':
-    order = Order(1)
+    order = models.get_order(1)
+    order = Order(order)
+    item = models.get_items()[0]
+    print(item)
+    # order.items.append()
+
     print(f'id: {order.id}')
     print(f'items: {order.items}')
-    print(f'owewr: {order.owner}')
+    print(f'owner: {order.owner}')
     print(f'created: {order.created}')
+    print(f'item: {item}')
