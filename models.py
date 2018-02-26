@@ -96,7 +96,7 @@ class Rule(Base):
 class ItemRules(Base):
     __tablename__ = 'item_rules'
     """if item_id == 0 - неразборчивое правило"""
-    item_id = Column(Integer, ForeignKey('items.id'), index=True, primary_key=True)
+    item_id = Column(Integer, ForeignKey('items.id'), index=True, primary_key=True, default=0)
     item_related_id = Column(Integer, index=True, primary_key=True)
     condition = Column(String, nullable=True)  # 'OR[:[min_trigger:int], max_trigger:int]]'
     trigger_value = Column(Integer, default=0)
@@ -113,10 +113,10 @@ class ItemRules(Base):
         self.rule = rule
 
     def __repr__(self):
-        return (f'ItemRules({self.item}, '
-                f'item_related: {self.item_related_id}, '
-                f'condition: {self.condition}, '
-                f'{self.rule})')
+        return (f'ItemRules(item_id: {self.item_id}'
+                f', item_related: {self.item_related_id}'
+                f', condition: {self.condition}')
+                # f', {self.rule})')
 
 
 class OrderItem(Base):

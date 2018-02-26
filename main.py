@@ -11,8 +11,15 @@ class Rule(object):
 class Order(object):
     def __init__(self, order: models.Order):
         self._order = order
+        self._rules = set()
         for order_item in order.items:
-            print(order_item.item.rules)
+            for rule in order_item.item.rules:
+                # print(f'{rule}')
+                r = rules.Rule(rule.rule, self.id)
+                item_related = list([i for i in order.items if i.item_id == rule.item_related_id])
+                item_related = item_related[0] if item_related else rule.item_related_id
+                r.add_receptor(rule, order_item, item_related)
+        # print(f'{self.items}')
 
     @property
     def id(self):
@@ -53,11 +60,11 @@ if __name__ == '__main__':
     order = models.get_order(1)
     order = Order(order)
     item = models.get_items()[0]
-    print(item)
+    # print(item)
     # order.items.append()
 
-    print(f'id: {order.id}')
-    print(f'items: {order.items}')
-    print(f'owner: {order.owner}')
-    print(f'created: {order.created}')
-    print(f'item: {item}')
+    # print(f'id: {order.id}')
+    # print(f'items: {order.items}')
+    # print(f'owner: {order.owner}')
+    # print(f'created: {order.created}')
+    # print(f'item: {item}')
