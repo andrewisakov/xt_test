@@ -3,6 +3,7 @@
 
 
 class Rule(object):
+    """ Правило (нейрон) """
     __instances = {}  # {rule_id: <instance>}
 
     def __new__(cls, rule):
@@ -11,88 +12,86 @@ class Rule(object):
         return cls.__instances[rule.id]
 
     def __init__(self, rule):
-        self.__receptors = set()
+        print(f'Rule: {rule}')
+        self._rules = set()
 
-    def register(self, receptor):
-        self.__receptors.add(receptor)
+    def add_receptor(self, item_rule, items):
+        print(f'{item_rule} {items})
 
-    def unregister(self, receptor):
-        self.__receptors.discard(receptor)
+    def get_result(self):
+        pass
+
+
+class RuleClass(object):
+    def __init__(self, trigger_value=1):
+        self._items = set()
+        self._trigger_value = trigger_value
+
+    def add_item(self, item):
+        self._items.add(item)
+
+    def del_item(self, item):
+        self._items.discard(item)
 
     @property
-    def result(self):
-        for rec in self.__receptors:
-            pass
+    def items(self):
+        return self._items
 
-    @property
-    def receptors(self):
-        return self.__receptors
-
-
-class Receptor(object):
-    __instances = {}  # {item_id: <instance>}
-
-    def __new__(cls, item):
-        if item.id not in cls.__instances.keys():
-            cls.__instances[item.id] = object.__new__(cls, item)
-        return cls.__instances[item.id]
-
-    def __init__(self, item):
-        self._rules = None
-        self._receptor = item.id
-        # TODO: Rule.add_receptor(item.id)
-
-    def _put_item(self, item):
-        # Установить состояние рецептора
-        pass
-
-    @classmethod
-    def send_items(cls, items):
-        for item in items:
-            if item.id in cls.__instances.keys():
-                cls.__instances[item.id]._put_item(item)
-
-    def add_rule(self, rule):
-        rule.register(self)
-
-
-class ODD(object):
-    def __init__(self, items: tuple):
+    @abstractmethod
+    def get_result(self):
         pass
 
 
-class AND(object):
-    def __init__(self, items: tuple):
+class ODD(RuleClass):
+    def get_result(self):
         pass
 
 
-class NOT(object):
-    def __init__(self):
+class NOT(RuleClass):
+    def get_result(self):
         pass
 
 
-class OR(object):
-    def __init__(self, items: tuple, min_count=0, max_count=2):
+class OR(RuleClass):
+    def get_result(self):
         pass
 
 
-class COUNT(object):
-    def __init__(self, items: tuple, count: int=0):
-        self._items = items
-        self._count = count
-
-
-class MAX(object):
-    def __init__(self):
+class COUNT(RuleClass):
+    def get_result(self):
         pass
 
 
-class MIN(object):
-    def __init__(self):
-        pass
+class MAX(RuleClass):
+    def get_result(self):
+        items = set()
+        for i in self._items:
+            if i is not None:
+                items.add([for item in i.get_result() if item is not None] if isinstance(i, RuleClass) else i)
+        return max(items, key=lamda x: x.quantity)
 
 
-class ONE(object):
-    def __init__(self):
-        pass
+class MIN(RuleClass):
+    def get_result(self):
+        # min_item = None
+        items = set()
+        for i in self._items:
+            if i is not None:
+                items.add([for item in i.get_result() if item is not None] if isinstance(i, RuleClass) else i)
+        # items = min(items, key=lamda x: x.quantity)
+        return min(items, key=lamda x: x.quantity)
 
+
+class ONE(RuleClass):
+    """ Один или указанное в trigger_value """
+    def get_result(self):
+        one_items = set([(i.get_result() if isinstance(i, RuleClass) else i)
+                         for i in self._items if i is not None])
+        return one_items if len(one_items) == self._trigger_value else set()
+
+
+class AND(RuleClass):
+    def get_result(self):
+        if None not in self._items:
+            return self._items
+        return set()

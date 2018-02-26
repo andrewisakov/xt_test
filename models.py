@@ -128,8 +128,9 @@ class OrderItem(Base):
     quantity = Column(Integer, default=1)
     item = relationship(Item, lazy='joined')
 
-    def __init__(self, item):
+    def __init__(self, item, quantity=1):
         self.item = item
+        self.quantity = quantity
 
     def __repr__(self):
         return f'OrderItem(order.id: {self.order.id}, item: {self.item}, quantity: {self.quantity})'
@@ -151,7 +152,7 @@ def get_order(order_id):
         return None
 
 
-def create_items(sesson):
+def create_items(session):
     new_items = [Item(name=chr(r), price=10.91)
                  for r in range(ord('A'), ord('Z') + 1)]
     session.add_all(new_items)
@@ -193,7 +194,7 @@ if __name__ == '__main__':
 
     items['F'] = session.query(Item).filter_by(name='F').one()
     items['G'] = session.query(Item).filter_by(name='G').one()
-    ruleEFG = Rule(condition='MIN', trigger_value=1,
+    ruleEFG = Rule(condition='AND:MIN', trigger_value=1,
                    description='E+F+G', discount=5)
     session.add_all([items['E'], items['F'], items['G'], ruleEFG])
     session.flush()
@@ -224,10 +225,11 @@ if __name__ == '__main__':
     session.flush()
 
     session.commit()
-    for item in session.query(Item).all():
-        print(f'{item}')
-    # print(f'rule: {rule}')
-    # print(order)
-    # session.delete(order)
-    # session.commit()
+    # for item in session.query(Item).all():
+    #     print(f'{item}')
+    order = Order()
+    order.items.append(OrderItem(items['A'], quantity=10))
+    order.items.append(OrderItem(items['B'], quantity=10))
+    session.add(order)
+    session.commit()
     session.close()
