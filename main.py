@@ -19,7 +19,11 @@ class Order(object):
                 item_related = list([i for i in order.items if i.item_id == rule.item_related_id])
                 item_related = item_related[0] if item_related else rule.item_related_id
                 r.add_receptor(rule, order_item, item_related)
-        # print(f'{self.items}')
+                self._rules.add(r)
+            if not order_item.item.rules:
+                pass
+        for r in self._rules:
+            print(f'Order: {r.get_result()}')
 
     @property
     def id(self):

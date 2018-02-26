@@ -115,8 +115,9 @@ class ItemRules(Base):
     def __repr__(self):
         return (f'ItemRules(item_id: {self.item_id}'
                 f', item_related: {self.item_related_id}'
-                f', condition: {self.condition}')
-                # f', {self.rule})')
+                f', condition: {self.condition}'
+                # f', {self.rule}'
+                ')')
 
 
 class OrderItem(Base):
