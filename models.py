@@ -68,7 +68,11 @@ class Item(Base):
         self.price = price
 
     def __repr__(self):
-        return f'Item(id: {self.id}, name: «{self.name}», price: {self.price}, rules: {self.rules})'
+        return (f'Item(id: {self.id}'
+                f', name: «{self.name}»'
+                f', price: {self.price}'
+                # f', rules: {self.rules}'
+                ')')
 
 
 class Rule(Base):
