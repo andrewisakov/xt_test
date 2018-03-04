@@ -4,17 +4,13 @@ import models
 import rules
 
 
-class Rule(object):
-    pass
-
-
 class Order(object):
     def __init__(self, order: models.Order):
         self._order = order
         self._rules = set()
         for order_item in order.items:
+            print(f'Order.order_item: {order_item}')
             for rule in order_item.item.rules:
-                # print(f'{rule}')
                 r = rules.Rule(rule.rule, self.id)
                 item_related = list([i for i in order.items if i.item_id == rule.item_related_id])
                 item_related = item_related[0] if item_related else rule.item_related_id
@@ -23,7 +19,8 @@ class Order(object):
             if not order_item.item.rules:
                 pass
         for r in self._rules:
-            print(f'Order: {r.get_result()}')
+            items, quantity, discount = r.get_result()
+            print(f'Order:\n\titems: {items}\n\tquantity: {quantity}\n\tdiscount: {discount}')
 
     @property
     def id(self):
