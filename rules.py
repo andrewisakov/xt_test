@@ -1,7 +1,8 @@
 #!/usr/bin/python3
+import sys
 from abc import abstractmethod
 from settings import logger
-# import models
+import models
 
 
 class Rule(object):
@@ -16,6 +17,7 @@ class Rule(object):
             _instance.tail = None
             _instance.rule = rule
             _instance._not_linked_cache = {}
+            _instance._linked_cache = {}
             cls.__instances[(order_id, rule.id)] = _instance
         return cls.__instances[(order_id, rule.id)]
 
@@ -25,31 +27,58 @@ class Rule(object):
             if ':' in item_rule.rule.condition:
                 self.root, self.tail = item_rule.rule.condition.split(':')
                 # self.root = RULES[self.root]()
-                self.root = eval(self.root)()
-                self.tail = eval(self.tail)()
+                # self.root = eval(self.root)()
+                self.root = getattr(sys.modules[__name__], self.root)
+                # self.tail = eval(self.tail)()
+                self.tail = getattr(sys.modules[__name__], self.tail)
                 self.tail.add_item(self.root)
             else:
-                self.root = self.tail = eval(item_rule.rule.condition)()
+                # self.root = self.tail = eval(item_rule.rule.condition)()
+                self.root = self.tail = getattr(sys.modules[__name__], item_rule.rule.condition)()
 
-    def set_receptors(self, item):
-        for items in self._not_linked_cache[item.item_id]:
-            items.discard(item.item_id)
-            items.add(item)
-        del self._not_linked_cache[item.item_id]
+    def remove_receptors(self, item: models.Item):
+        """Удаление item из order"""
+        if item.item_id not in self._not_linked_cache.keys():
+            self._not_linked_cache[item.item_id] = set()
+        if item in self._linked_cache.keys():
+            for items in self._linked_cache[item]:
+                items.discard(item)
+                items.add(item.item_id)
+                self._not_linked_cache[item.item_id].add(items)
+            del self._linked_cache[item]
 
-    def put_not_linked_cache(self, item_related, _rule):
+    def update_receptors(self, item: models.Item):
+        """Добавление item в order"""
+        if item not in self._linked_cache:
+            self._linked_cache[item] = set()
+        if item.item_id in self._not_linked_cache.keys():
+            for items in self._not_linked_cache[item.item_id]:
+                items.discard(item.item_id)
+                items.add(item)
+                self._linked_cache[item].add(items)
+            del self._not_linked_cache[item.item_id]
+
+    def put_not_linked_cache(self, item_related: int, _rule):
         # Кэш рецепторов для отсутствующих в ордере элементов
         if item_related not in self._not_linked_cache.keys():
             self._not_linked_cache[item_related] = set()
         self._not_linked_cache[item_related].add(_rule)
 
+    def put_linked_cache(self, item_related: models.Item, _rule):
+        if item_related not in self._linked_cache.keys():
+            self._linked_cache[item_related] = set()
+        self._linked_cache[item_related].add(_rule)
+
     def add_receptor(self, item_rule, order_item, item_related):
         self.set_root(item_rule)
-        _rule = eval(item_rule.condition)(trigger_value=item_rule.trigger_value)  #, discount=item_rule.discount)
+        # _rule = eval(item_rule.condition)(trigger_value=item_rule.trigger_value)  #, discount=item_rule.discount)
+        _rule = getattr(sys.modules[__name__], item_rule.condition)(trigger_value=item_rule.trigger_value)
         _rule.add_item(order_item)
         _rule.add_item(item_related)
         if isinstance(item_related, int):
             self.put_not_linked_cache(item_related, _rule)
+        else:
+            self.put_linked_cache(item_related, _rule)
         self.root.add_item(_rule)
         print(f'add_receptor: {type(_rule).__name__} {_rule._items}')
 
