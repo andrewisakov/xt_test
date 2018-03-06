@@ -26,15 +26,12 @@ class Rule(object):
             # print(f'set_root: {item_rule.rule.condition}')
             if ':' in item_rule.rule.condition:
                 self.root, self.tail = item_rule.rule.condition.split(':')
-                # self.root = RULES[self.root]()
-                # self.root = eval(self.root)()
-                self.root = getattr(sys.modules[__name__], self.root)
-                # self.tail = eval(self.tail)()
-                self.tail = getattr(sys.modules[__name__], self.tail)
+                self.root = getattr(sys.modules[__name__], self.root)()
+                self.tail = getattr(sys.modules[__name__], self.tail)()
                 self.tail.add_item(self.root)
             else:
-                # self.root = self.tail = eval(item_rule.rule.condition)()
-                self.root = self.tail = getattr(sys.modules[__name__], item_rule.rule.condition)()
+                self.root = self.tail = getattr(
+                    sys.modules[__name__], item_rule.rule.condition)()
 
     def remove_receptors(self, item: models.Item):
         """Удаление item из order"""
@@ -42,21 +39,23 @@ class Rule(object):
             self._not_linked_cache[item.item_id] = set()
         if item in self._linked_cache.keys():
             for items in self._linked_cache[item]:
-                items.discard(item)
-                items.add(item.item_id)
+                items.del_item(item)
+                items.add_item(item.item_id)
                 self._not_linked_cache[item.item_id].add(items)
             del self._linked_cache[item]
 
-    def update_receptors(self, item: models.Item):
+    def update_receptors(self, order_item: models.Item):
         """Добавление item в order"""
-        if item not in self._linked_cache:
-            self._linked_cache[item] = set()
-        if item.item_id in self._not_linked_cache.keys():
-            for items in self._not_linked_cache[item.item_id]:
-                items.discard(item.item_id)
-                items.add(item)
-                self._linked_cache[item].add(items)
-            del self._not_linked_cache[item.item_id]
+        if order_item not in self._linked_cache:
+            self._linked_cache[order_item] = set()
+        if order_item.item_id in self._not_linked_cache.keys():
+            for items in self._not_linked_cache[order_item.item_id]:
+                # print(f'Rule.update_receptors: {items}')
+                items.del_item(order_item.item_id)
+                items.add_item(order_item)
+                self._linked_cache[order_item].add(items)
+                # print(f'update_receptor: {items}')
+            del self._not_linked_cache[order_item.item_id]
 
     def put_not_linked_cache(self, item_related: int, _rule):
         # Кэш рецепторов для отсутствующих в ордере элементов
@@ -71,8 +70,8 @@ class Rule(object):
 
     def add_receptor(self, item_rule, order_item, item_related):
         self.set_root(item_rule)
-        # _rule = eval(item_rule.condition)(trigger_value=item_rule.trigger_value)  #, discount=item_rule.discount)
-        _rule = getattr(sys.modules[__name__], item_rule.condition)(trigger_value=item_rule.trigger_value)
+        _rule = getattr(sys.modules[__name__], item_rule.condition)(
+            trigger_value=item_rule.trigger_value)
         _rule.add_item(order_item)
         _rule.add_item(item_related)
         if isinstance(item_related, int):
@@ -80,13 +79,25 @@ class Rule(object):
         else:
             self.put_linked_cache(item_related, _rule)
         self.root.add_item(_rule)
-        print(f'add_receptor: {type(_rule).__name__} {_rule._items}')
+        logger.debug(f'add_receptor: {type(_rule).__name__} {_rule._items}')
 
     def get_result(self):
-        # print(f'Rule.get_result: {self._not_linked_cache}')
         _result = self.tail.get_result()
-        print(f'Rule.get_result (1): {_result}')
         return _result + (self.rule.discount, ) if _result != set() else 0
+
+    def __repr__(self):
+        return f'{self.rule} {self.tail}'
+
+
+def flatten(lis):
+    """Given a list, possibly nested to any level, return it flattened."""
+    new_lis = []
+    for item in lis:
+        if isinstance(item, list):
+            new_lis.extend(flatten(item))
+        else:
+            new_lis.append(item)
+    return new_lis
 
 
 class RuleClass(object):
@@ -97,9 +108,11 @@ class RuleClass(object):
 
     def add_item(self, item):
         self._items.add(item)
+        logger.debug(f'RuleClass.add_item: {item}')
 
     def del_item(self, item):
         self._items.discard(item)
+        logger.debug(f'RuleClass.del_item: {item}')
 
     @property
     def items(self):
@@ -108,6 +121,9 @@ class RuleClass(object):
     @abstractmethod
     def get_result(self):
         pass
+
+    def __repr__(self):
+        return (f'{type(self).__name__}: {self._items}')
 
 
 class ODD(RuleClass):
@@ -132,34 +148,32 @@ class MAX(RuleClass):
         max_items = []
         for i in self._items:
             if isinstance(i, RuleClass):
-                max_items = set(
-                    [item for item in i.get_result() if item is not None])
-            else:
-                max_items.add(i)
-        max_trigger = max(max_items, key=lambda x: x.quantity) if max_items else []
+                logger.debug(f'{type(self).__name__} (2): {i}')
+                items = i.get_result()
+                logger.debug(f'{type(self).__name__} (3): {items}')
+                min_items += items[0]
+        max_trigger = max(
+            max_items, key=lambda x: x.quantity) if max_items else None
         max_trigger = max_trigger.quantity if max_trigger else 0
-        print(f'{type(self).__name__} max_trigger: {max_trigger}')
+        logger.debug(f'{type(self).__name__} max_trigger: {max_trigger}')
         return max_items, max_trigger
 
 
 class MIN(RuleClass):
     def get_result(self):
-        # min_item = None
-        print(f'{type(self).__name__} (1): {self._items}')
+        logger.debug(f'{type(self).__name__} (1): {self._items}')
         min_items = []
         for i in self._items:
             if isinstance(i, RuleClass):
-                print(f'{type(self).__name__} (2): {i}')
+                logger.debug(f'{type(self).__name__} (2): {i}')
                 items = i.get_result()
-                print(f'{type(self).__name__} (3): {items}')
+                logger.debug(f'{type(self).__name__} (3): {items}')
                 min_items += items[0]
-                    # [item[0] for item in i.get_result() if item[0] != set()])
-            # else:
-            #     min_items.add(i)
-        print(f'{type(self).__name__} (4): {min_items}')
-        min_trigger = min(min_items, key=lambda x: x.quantity) if min_items else None
+        logger.debug(f'{type(self).__name__} (4): {min_items}')
+        min_trigger = min(
+            min_items, key=lambda x: x.quantity) if min_items else None
         min_trigger = min_trigger.quantity if min_trigger else 0
-        print(f'{type(self).__name__} (5): {min_trigger}')
+        logger.debug(f'{type(self).__name__} (5): {min_trigger}')
         return min_items, min_trigger
 
 
@@ -167,43 +181,46 @@ class ONE(RuleClass):
     """ Один или указанное в trigger_value """
 
     def get_result(self):
-        print(f'{type(self).__name__}: {self._items}')
-        # one_items = [(i.get_result() if isinstance(i, RuleClass) else i)
-        #              for i in self._items if i != set()]
+        logger.debug(f'{type(self).__name__} (1): {self._items}')
         one_items = []
         for i in self._items:
-            print(f'{type(self).__name__} i: {i}')
             if isinstance(i, RuleClass):
                 ii = i.get_result()
-                if ii:
-                    one_items.append(ii)
-            # else:
-            #     one_items.append()
+                if ii and (ii[1] > 0):
+                    one_items.append(ii[0])
+            elif not isinstance(i, int):
+                one_items.append(i)
 
-        print(f'{type(self).__name__} one_items: {one_items}')
-        # one_items = set(one_items)
-        return (one_items, self._trigger_value) if len(one_items) == self._trigger_value else ([], 0)
+        logger.debug(f'{type(self).__name__} one_items (4): {one_items}')
+
+        return (one_items[0], self._trigger_value) if len(one_items) == self._trigger_value else ([], 0)
 
 
 class AND(RuleClass):
 
     def get_result(self):
-        print(f'{type(self).__name__} (1): {self._items}')
+        logger.debug(f'{type(self).__name__} (1): {self._items} {len(self._items)}')
         and_items = []
         for i in self._items:
-            print(f'{type(self).__name__} (2): {i}')
-            if not isinstance(i, int):
+            if isinstance(i, RuleClass):
+                ii = i.get_result()
+                if ii and (ii[1] > 0):
+                    and_items.append(ii[0])
+            elif not isinstance(i, int):
                 and_items.append(i)
-        and_items = set(and_items) if len(and_items) == len(self._items) else set()
-        print(f'{type(self).__name__} (3): {and_items}')
-        and_items = [item for item in and_items] if and_items != set() else []
-        print(f'{type(self).__name__} (4): {and_items}')
-        return (and_items, len(and_items)) if (len(and_items) == len(self._items)) else ([], 0)
+        logger.debug(f'{type(self).__name__} (3): {and_items} {len(and_items)}')
+        if len(and_items) == len(self._items):
+            and_items = flatten(and_items)
+            logger.debug(
+                f'{type(self).__name__} (4): {and_items} {len(and_items)}')
+            and_items = list(set(and_items))
+            return (and_items, len(and_items))
+        return ([], 0)
 
 
 class OR(RuleClass):
     def get_result(self):
-        print(f'{type(self).__name__}: {self._items}')
+        logger.debug(f'{type(self).__name__}: {self._items}')
         or_items = []
         for i in self._items:
             or_items = [(i.get_result() if isinstance(i, RuleClass) else i)

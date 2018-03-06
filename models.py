@@ -3,16 +3,14 @@
 import datetime
 from decimal import Decimal as D
 import sqlalchemy.types as types
-from sqlalchemy import Column, Numeric, DateTime, String, Integer, Boolean, ForeignKey, create_engine, func
+from sqlalchemy import (Column, Numeric, DateTime, String, Integer,
+                        Boolean, ForeignKey, create_engine, func)
 from sqlalchemy.orm import relationship, backref, sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.interfaces import PoolListener
 import settings
 
 Base = declarative_base()
-# engine = create_engine(f'sqlite:///{settings.DB_PATH}')
-# session = sessionmaker()
-# session.configure(bind=engine)
 conditions = ('AND', 'NOT', 'OR', 'COUNT', 'MAX', 'MIN', 'PAIRS', 'ODD')
 
 
@@ -21,7 +19,8 @@ class ForeignKeysListener(PoolListener):
         db_cursor = dbapi_con.execute('pragma foreign_keys=ON')
 
 
-engine = create_engine(f'sqlite:///{settings.DB_PATH}', listeners=[ForeignKeysListener()])
+engine = create_engine(
+    f'sqlite:///{settings.DB_PATH}', listeners=[ForeignKeysListener()])
 
 
 class Decimal(types.TypeDecorator):
@@ -60,8 +59,10 @@ class Item(Base):
     __tablename__ = 'items'
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, index=True, unique=True)
-    price = Column(Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
-    rules = relationship('ItemRules', cascade='all, delete-orphan', backref='item')
+    price = Column(
+        Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
+    rules = relationship(
+        'ItemRules', cascade='all, delete-orphan', backref='item')
 
     def __init__(self, name, price=0):
         self.name = name
@@ -80,9 +81,11 @@ class Rule(Base):
     id = Column(Integer, primary_key=True)
     condition = Column(String, )  # 'OR[:[min_trigger:int], max_trigger:int]]'
     trigger_value = Column(Integer, default=0)
-    discount = Column(Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
+    discount = Column(
+        Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
     description = Column(String, index=True)
-    item_rules = relationship('ItemRules', backref='rule')
+    item_rules = relationship(
+        'ItemRules', cascade='all, delete-orphan', backref='rule')
     # item_rules
 
     def __init__(self, condition, trigger_value=1, discount=0, description=''):
@@ -106,8 +109,6 @@ class ItemRules(Base):
     trigger_value = Column(Integer, default=0)
     result_value = Column(Integer, default=0)
     as_boolean = Column(Boolean, default=False)
-    # item = relationship(Column(Integer, ForeignKey('items.id'), index=True,
-    #               backref='item_rules', cascade='all, delete-orphan', primary_key=True))
     rule_id = Column(Integer, ForeignKey('rules.id'), index=True)
 
     def __init__(self, item, item_related_id, condition='AND', rule=None):
@@ -120,7 +121,7 @@ class ItemRules(Base):
         return (f'ItemRules(item_id: {self.item_id}'
                 f', item_related: {self.item_related_id}'
                 f', condition: {self.condition}'
-                # f', {self.rule}'
+                f', rule_id: {self.rule.id}'
                 ')')
 
 
@@ -138,23 +139,31 @@ class OrderItem(Base):
         self.quantity = quantity
 
     def __repr__(self):
-        return f'OrderItem(order.id: {self.order.id}, item: {self.item}, quantity: {self.quantity})'
+        return (f'OrderItem(order.id: {self.order.id}'
+        f', item: {self.item}'
+        f', quantity: {self.quantity}'
+        ')')
 
 
 def get_items():
     session = Session(engine)
     items = session.query(Item).all()
+    session.close()
     return items
+
+
+def get_item(name):
+    session = Session(engine)
+    item = session.query(Item).filter_by(name=name)
+    session.close()
+    return item[0] if item else None
 
 
 def get_order(order_id):
     session = Session(engine)
     order = session.query(Order).filter_by(id=order_id)
     session.close()
-    if order:
-        return order[0]
-    else:
-        return None
+    return order[0] if order else None
 
 
 def create_items(session):
@@ -162,6 +171,7 @@ def create_items(session):
                  for r in range(ord('A'), ord('Z') + 1)]
     session.add_all(new_items)
     session.commit()
+    session.close()
     return new_items
 
 
@@ -193,7 +203,7 @@ if __name__ == '__main__':
     session.add_all([items['D'], items['E'], ruleDE])
     session.flush()
     item_rule = ItemRules(
-        item=items['D'], item_related_id=items['B'].id,
+        item=items['D'], item_related_id=items['E'].id,
         condition='AND', rule=ruleDE)
     session.add(item_rule)
 
@@ -215,7 +225,7 @@ if __name__ == '__main__':
     items['K'] = session.query(Item).filter_by(name='K').one()
     items['L'] = session.query(Item).filter_by(name='L').one()
     items['M'] = session.query(Item).filter_by(name='M').one()
-    ruleAKLM = Rule(condition='ONE', trigger_value=1,
+    ruleAKLM = Rule(condition='ONE:MIN', trigger_value=1,
                     description='A AND ONE(K, L, M)', discount=5)
     item_ruleAK = ItemRules(
         item=items['A'], item_related_id=items['K'].id,
