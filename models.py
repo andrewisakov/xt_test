@@ -3,9 +3,9 @@
 import datetime
 from decimal import Decimal as D
 import sqlalchemy.types as types
-from sqlalchemy import (Column, Numeric, DateTime, String, Integer,
+from sqlalchemy import (Column, DateTime, String, Integer,
                         Boolean, ForeignKey, create_engine, func)
-from sqlalchemy.orm import relationship, backref, sessionmaker, Session
+from sqlalchemy.orm import relationship, backref, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.interfaces import PoolListener
 import settings
@@ -46,13 +46,17 @@ class Order(Base):
     id = Column(Integer, primary_key=True)
     created = Column(DateTime, default=func.now(), index=True)
     user_id = Column(Integer, default=-1)
-    items = relationship('OrderItem', cascade='all, delete-orphan', backref='order')
+    items = relationship(
+        'OrderItem', cascade='all, delete-orphan', backref='order')
 
     def __init__(self, user_id: int=-1, ):
         self.user_id = user_id
 
     def __repr__(self):
-        return f'Order(id: {self.id}, created: {self.created}, items: {self.items})'
+        return (f'Order(id: {self.id}'
+                f', created: {self.created}'
+                f', items: {self.items}'
+                ')')
 
 
 class Item(Base):
@@ -64,9 +68,11 @@ class Item(Base):
     rules = relationship(
         'ItemRules', cascade='all, delete-orphan', backref='item')
 
-    def __init__(self, name, price=0):
+    def __init__(self, name, price=0, id=None):
         self.name = name
         self.price = price
+        if id == 0:
+            self.id = 0
 
     def __repr__(self):
         return (f'Item(id: {self.id}'
@@ -103,13 +109,16 @@ class Rule(Base):
 class ItemRules(Base):
     __tablename__ = 'item_rules'
     """if item_id == 0 - неразборчивое правило"""
-    item_id = Column(Integer, ForeignKey('items.id'), index=True, primary_key=True, default=0)
+    item_id = Column(Integer, ForeignKey('items.id'),
+                     index=True, primary_key=True, default=0)
     item_related_id = Column(Integer, index=True, primary_key=True)
-    condition = Column(String, nullable=True)  # 'OR[:[min_trigger:int], max_trigger:int]]'
+    # 'OR[:[min_trigger:int], max_trigger:int]]'
+    condition = Column(String, nullable=True)
     trigger_value = Column(Integer, default=0)
     result_value = Column(Integer, default=0)
     as_boolean = Column(Boolean, default=False)
-    rule_id = Column(Integer, ForeignKey('rules.id'), index=True)
+    rule_id = Column(Integer, ForeignKey('rules.id'),
+                     index=True, primary_key=True)
 
     def __init__(self, item, item_related_id, condition='AND', rule=None):
         self.item = item
@@ -121,7 +130,8 @@ class ItemRules(Base):
         return (f'ItemRules(item_id: {self.item_id}'
                 f', item_related: {self.item_related_id}'
                 f', condition: {self.condition}'
-                f', rule_id: {self.rule.id}'
+                f', rule.id: {self.rule.id}'
+                f', rule.trigger_value: {self.rule.trigger_value}'
                 ')')
 
 
@@ -140,9 +150,9 @@ class OrderItem(Base):
 
     def __repr__(self):
         return (f'OrderItem(order.id: {self.order.id}'
-        f', item: {self.item}'
-        f', quantity: {self.quantity}'
-        ')')
+                f', item: {self.item}'
+                f', quantity: {self.quantity}'
+                ')')
 
 
 def get_items():
@@ -169,6 +179,7 @@ def get_order(order_id):
 def create_items(session):
     new_items = [Item(name=chr(r), price=10.91)
                  for r in range(ord('A'), ord('Z') + 1)]
+    new_items.append(Item(id=0, name='Null Item'))
     session.add_all(new_items)
     session.commit()
     session.close()
@@ -236,10 +247,42 @@ if __name__ == '__main__':
     item_ruleAM = ItemRules(
         item=items['A'], item_related_id=items['M'].id,
         condition='AND', rule=ruleAKLM)
-    session.add_all([item_ruleAK, item_ruleAL, item_ruleAM])
+    session.add_all([ruleAKLM, item_ruleAK, item_ruleAL, item_ruleAM])
     session.flush()
 
     session.commit()
+    items['0'] = session.query(Item).filter_by(id=0).one()
+    items['C'] = session.query(Item).filter_by(name='C').one()
+    promirule3 = Rule(
+        condition='AND', description='3 w/o A, C', trigger_value=3, discount=5)
+    promirules3_A = ItemRules(
+        item=items['0'], item_related_id=items['A'].id, condition='NOT',
+        rule=promirule3)
+    promirules3_C = ItemRules(
+        item=items['0'], item_related_id=items['C'].id, condition='NOT',
+        rule=promirule3)
+    session.add_all([promirule3, promirules3_A, promirules3_C])
+    session.flush()
+    promirule4 = Rule(
+        condition='AND', description='4 w/o A, C', trigger_value=4, discount=10)
+    promirules4_A = ItemRules(
+        item=items['0'], item_related_id=items['A'].id, condition='NOT',
+        rule=promirule4)
+    promirules4_C = ItemRules(
+        item=items['0'], item_related_id=items['C'].id, condition='NOT',
+        rule=promirule4)
+    session.add_all([promirule4, promirules4_A, promirules4_C])
+    session.flush()
+    promirule5 = Rule(
+        condition='AND', description='4 w/o A, C', trigger_value=5, discount=20)
+    promirules5_A = ItemRules(
+        item=items['0'], item_related_id=items['A'].id, condition='NOT',
+        rule=promirule5)
+    promirules5_C = ItemRules(
+        item=items['0'], item_related_id=items['C'].id, condition='NOT',
+        rule=promirule5)
+    session.add_all([promirule5, promirules5_A, promirules5_C])
+    session.flush()
     # for item in session.query(Item).all():
     #     print(f'{item}')
     order = Order()

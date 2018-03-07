@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import datetime
+from sqlalchemy import and_
 import models
 import rules
 
@@ -7,6 +7,7 @@ import rules
 class Order(object):
     def __init__(self, order_id: int = None):
         self._session = models.Session(models.engine)
+        # self.load_promiscuous_rules()
         if order_id:
             self._order = self.session.query(models.Order).filter(
                 models.Order.id == order_id).one_or_none()
@@ -15,6 +16,13 @@ class Order(object):
             self.commit(self._order)
         self._rules = set()
         self.add_items()
+
+    def load_promiscuous_rules(self):
+        promirules = self.session.query(models.Rule)\
+            .filter(models.ItemRules.item_id == 0)\
+            .filter(models.Rule.trigger_value == len(self._order.items))\
+            .all()
+        return promirules
 
     @property
     def rules(self):
@@ -48,15 +56,16 @@ class Order(object):
     def recalc(self):
         discounts = []
         for r in self._rules:
-            items, quantity, discount = r.get_result()
-            discounts.append(dict(items=items, quantity=quantity, discount=discount))
+            _items, quantity, discount = r.get_result()
+            discounts.append(
+                dict(items=_items, quantity=quantity, discount=discount))
         return discounts
 
-    def add_items(self, items=None):
-        if isinstance(items, list):
+    def add_items(self, order_items=None):
+        if isinstance(order_items, list):
             # print(f'add_items: {items}')
-            for item in items:
-                if isinstance(item, models.Item):
+            for _item in order_items:
+                if isinstance(_item, models.Item):
                     pass
         for order_item in self._order.items:
             print(f'Order.add_items order_item: {order_item}')
@@ -78,6 +87,8 @@ class Order(object):
             r.add_receptor(rule, order_item, item_related)
             self._rules.add(r)
 
+        print(f'Order.add_item.promiscuous_rules: {self.load_promiscuous_rules()} {len(self._order.items)}')
+
         for rule in self._rules:
             rule.update_receptors(order_item)
 
@@ -92,8 +103,10 @@ class Order(object):
 
 if __name__ == '__main__':
     order = Order()
-    items = order.session.query(models.Item).filter(models.Item.name.in_(('A', 'B', 'L', 'D'))).all()
-    items += order.session.query(models.Item).filter(models.Item.name.in_(('E', 'F', 'G',))).all()
+    items = order.session.query(models.Item).filter(
+        models.Item.name.in_(('A', 'B', 'L', 'D'))).all()
+    items += order.session.query(models.Item).filter(
+        models.Item.name.in_(('E', 'F', 'G',))).all()
     for item in items:
         order.add_item(item, 10)
     # print(f'add_items: {items}')
