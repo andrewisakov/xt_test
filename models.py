@@ -47,7 +47,7 @@ class Order(Base):
     created = Column(DateTime, default=func.now(), index=True)
     user_id = Column(Integer, default=-1)
     items = relationship(
-        'OrderItem', cascade='all, delete-orphan', backref='order')
+        'OrderItem', cascade='all, delete-orphan', back_populates='order')
 
     def __init__(self, user_id: int=-1, ):
         self.user_id = user_id
@@ -66,7 +66,7 @@ class Item(Base):
     price = Column(
         Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
     rules = relationship(
-        'ItemRules', cascade='all, delete-orphan', backref='item')
+        'ItemRules', cascade='all, delete-orphan', back_populates='item')
 
     def __init__(self, name, price=0, id=None):
         self.name = name
@@ -91,7 +91,7 @@ class Rule(Base):
         Decimal(precision=2, asdecimal=True, decimal_return_scale=2))
     description = Column(String, index=True)
     item_rules = relationship(
-        'ItemRules', cascade='all, delete-orphan', backref='rule')
+        'ItemRules', cascade='all, delete-orphan', back_populates='rule')
     # item_rules
 
     def __init__(self, condition, trigger_value=1, discount=0, description=''):
@@ -119,6 +119,8 @@ class ItemRules(Base):
     as_boolean = Column(Boolean, default=False)
     rule_id = Column(Integer, ForeignKey('rules.id'),
                      index=True, primary_key=True)
+    rule = relationship('Rule', back_populates='item_rules')
+    item = relationship('Item', back_populates='rules')
 
     def __init__(self, item, item_related_id, condition='AND', rule=None):
         self.item = item
@@ -143,6 +145,7 @@ class OrderItem(Base):
     # discount = DecimalField(max_digits=10, decimal_places=2, default=0)
     quantity = Column(Integer, default=1)
     item = relationship(Item, lazy='joined')
+    order = relationship('Order', back_populates='items')
 
     def __init__(self, item, quantity=1):
         self.item = item

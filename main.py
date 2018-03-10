@@ -8,20 +8,21 @@ class Order(object):
     def __init__(self, order_id: int = None):
         self._session = models.Session(models.engine)
         # self.load_promiscuous_rules()
-        if order_id:
+        self._order = None
+        if isinstance(order_id, int):
             self._order = self.session.query(models.Order).filter(
                 models.Order.id == order_id).one_or_none()
-        else:
+        if self._order is None:
             self._order = models.Order()
             self.commit(self._order)
         self._rules = set()
         self.add_items()
 
     def load_promiscuous_rules(self):
-        promirules = self.session.query(models.Rule)\
-            .filter(models.ItemRules.item_id == 0)\
-            .filter(models.Rule.trigger_value == len(self._order.items))\
-            .all()
+        promirules = self.session.query(models.Rule).filter(models.Rule.trigger_value == len(
+            self._order.items)).join(models.ItemRules).filter(models.ItemRules.item_id == 0)
+        # print(promirules)
+        promirules = promirules.all()
         return promirules
 
     @property
@@ -57,8 +58,9 @@ class Order(object):
         discounts = []
         for r in self._rules:
             _items, quantity, discount = r.get_result()
-            discounts.append(
-                dict(items=_items, quantity=quantity, discount=discount))
+            if _items:
+                discounts.append(
+                    dict(items=_items, quantity=quantity, discount=discount))
         return discounts
 
     def add_items(self, order_items=None):
@@ -87,7 +89,17 @@ class Order(object):
             r.add_receptor(rule, order_item, item_related)
             self._rules.add(r)
 
-        print(f'Order.add_item.promiscuous_rules: {self.load_promiscuous_rules()} {len(self._order.items)}')
+        for promirule in self.load_promiscuous_rules():
+            print(f'add_item.promirule: {promirule} {promirule.item_rules}')
+            r = rules.Rule(promirule, self.id)
+            for item_rule in promirule.item_rules:
+                for order_item in self._order.items:
+                    item_related = list(
+                        [i for i in self._order.items if i.item_id == item_rule.item_related_id])
+                    item_related = item_related[0] if item_related else item_rule.item_related_id
+                    r.add_receptor(item_rule, order_item, item_related)
+                    self._rules.add(r)
+                    print(r)
 
         for rule in self._rules:
             rule.update_receptors(order_item)

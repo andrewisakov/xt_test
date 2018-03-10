@@ -6,7 +6,7 @@ import models
 
 
 class Rule(object):
-    """ Правило (нейрон) """
+    """ Правило (автомат) """
     __instances = {}  # {(order_id, rule_id): <instance>}
 
     def __new__(cls, rule, order_id):
@@ -89,29 +89,28 @@ class Rule(object):
         return f'{self.rule} {self.tail}'
 
 
-def flatten(lis):
-    """Given a list, possibly nested to any level, return it flattened."""
-    new_lis = []
-    for item in lis:
-        if isinstance(item, list):
-            new_lis.extend(flatten(item))
-        else:
-            new_lis.append(item)
-    return new_lis
-
-
 class RuleClass(object):
     def __init__(self, trigger_value=1):
-        self._items = set()
+        self._items = []
         self._trigger_value = trigger_value
         # self._discount = discount
 
+    def flatten(self, lis):
+        """Given a list, possibly nested to any level, return it flattened."""
+        new_lis = []
+        for item in lis:
+            if isinstance(item, list):
+                new_lis.extend(self.flatten(item))
+            else:
+                new_lis.append(item)
+        return new_lis
+
     def add_item(self, item):
-        self._items.add(item)
+        self._items.append(item)
         logger.debug(f'RuleClass.add_item: {item}')
 
     def del_item(self, item):
-        self._items.discard(item)
+        self._items.remove(item)
         logger.debug(f'RuleClass.del_item: {item}')
 
     @property
@@ -132,9 +131,24 @@ class ODD(RuleClass):
 
 
 class NOT(RuleClass):
-
+    """Не равенство"""
     def get_result(self):
-        pass
+        print(f'{type(self).__name__} items: {self._items}')
+        not_items = []
+        for i in self._items:
+            if isinstance(i, RuleClass):
+                items = i.get_result()
+                not_items.append(items[0])
+            elif not isinstance(i, int):
+                not_items.append(i)
+        print(f'{type(self).__name__} not_items: {not_items}')
+        if len(not_items) != 2:
+            return [(), 0]
+        else:
+            if not_items[0] != not_items[1]:
+                return [not_items[0], 1]
+            else:
+                return [(), 0]
 
 
 class COUNT(RuleClass):
@@ -210,7 +224,7 @@ class AND(RuleClass):
                 and_items.append(i)
         logger.debug(f'{type(self).__name__} (3): {and_items} {len(and_items)}')
         if len(and_items) == len(self._items):
-            and_items = flatten(and_items)
+            and_items = self.flatten(and_items)
             logger.debug(
                 f'{type(self).__name__} (4): {and_items} {len(and_items)}')
             and_items = list(set(and_items))
@@ -223,7 +237,11 @@ class OR(RuleClass):
         logger.debug(f'{type(self).__name__}: {self._items}')
         or_items = []
         for i in self._items:
-            or_items = [(i.get_result() if isinstance(i, RuleClass) else i)
-                        for i in self._items if i is not None]
+            if isinstance(i, RuleClass):
+                ii = i.get_result()
+                print(f'{type(self).__name__}: {ii}')
+                if ii and (ii[1] > 0):
+                    or_items.append(ii[0])
+        print(f'{type(self).__name__}: {or_items}')
         # or_items = set(or_items)
         return (or_items, len(or_items))
