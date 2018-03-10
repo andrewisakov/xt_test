@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from sqlalchemy import and_
+from settings import logger
 import models
 import rules
 
@@ -70,7 +71,7 @@ class Order(object):
                 if isinstance(_item, models.Item):
                     pass
         for order_item in self._order.items:
-            print(f'Order.add_items order_item: {order_item}')
+            logger.debug(f'Order.add_items order_item: {order_item}')
             self.add_item(order_item)
 
     def add_item(self, order_item, quantity=1):
@@ -90,7 +91,7 @@ class Order(object):
             self._rules.add(r)
 
         for promirule in self.load_promiscuous_rules():
-            print(f'add_item.promirule: {promirule} {promirule.item_rules}')
+            logger.debug(f'add_item.promirule: {promirule} {promirule.item_rules}')
             r = rules.Rule(promirule, self.id)
             for item_rule in promirule.item_rules:
                 for order_item in self._order.items:
@@ -99,7 +100,7 @@ class Order(object):
                     item_related = item_related[0] if item_related else item_rule.item_related_id
                     r.add_receptor(item_rule, order_item, item_related)
                     self._rules.add(r)
-                    print(r)
+                    # print(r)
 
         for rule in self._rules:
             rule.update_receptors(order_item)

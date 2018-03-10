@@ -10,7 +10,7 @@ class Rule(object):
     __instances = {}  # {(order_id, rule_id): <instance>}
 
     def __new__(cls, rule, order_id):
-        # print(f'Rule.__new__.rule: {rule}')
+        # logger.debug(f'Rule.__new__.rule: {rule}')
         if (order_id, rule.id) not in cls.__instances.keys():
             _instance = object.__new__(cls)
             _instance.root = None
@@ -23,7 +23,7 @@ class Rule(object):
 
     def set_root(self, item_rule):
         if self.tail is None:
-            # print(f'set_root: {item_rule.rule.condition}')
+            # logger.debug(f'set_root: {item_rule.rule.condition}')
             if ':' in item_rule.rule.condition:
                 self.root, self.tail = item_rule.rule.condition.split(':')
                 self.root = getattr(sys.modules[__name__], self.root)()
@@ -50,11 +50,11 @@ class Rule(object):
             self._linked_cache[order_item] = set()
         if order_item.item_id in self._not_linked_cache.keys():
             for items in self._not_linked_cache[order_item.item_id]:
-                # print(f'Rule.update_receptors: {items}')
+                # logger.debug(f'Rule.update_receptors: {items}')
                 items.del_item(order_item.item_id)
                 items.add_item(order_item)
                 self._linked_cache[order_item].add(items)
-                # print(f'update_receptor: {items}')
+                # logger.debug(f'update_receptor: {items}')
             del self._not_linked_cache[order_item.item_id]
 
     def put_not_linked_cache(self, item_related: int, _rule):
@@ -133,7 +133,7 @@ class ODD(RuleClass):
 class NOT(RuleClass):
     """Не равенство"""
     def get_result(self):
-        print(f'{type(self).__name__} items: {self._items}')
+        logger.debug(f'{type(self).__name__} items: {self._items}')
         not_items = []
         for i in self._items:
             if isinstance(i, RuleClass):
@@ -141,7 +141,7 @@ class NOT(RuleClass):
                 not_items.append(items[0])
             elif not isinstance(i, int):
                 not_items.append(i)
-        print(f'{type(self).__name__} not_items: {not_items}')
+        logger.debug(f'{type(self).__name__} not_items: {not_items}')
         if len(not_items) != 2:
             return [(), 0]
         else:
@@ -239,9 +239,9 @@ class OR(RuleClass):
         for i in self._items:
             if isinstance(i, RuleClass):
                 ii = i.get_result()
-                print(f'{type(self).__name__}: {ii}')
+                logger.debug(f'{type(self).__name__}: {ii}')
                 if ii and (ii[1] > 0):
                     or_items.append(ii[0])
-        print(f'{type(self).__name__}: {or_items}')
+        logger.debug(f'{type(self).__name__}: {or_items}')
         # or_items = set(or_items)
         return (or_items, len(or_items))
